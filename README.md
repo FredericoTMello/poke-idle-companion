@@ -57,6 +57,22 @@ Esta é a parte que mais importa, e não vai mudar:
 
 O código é aberto justamente para que isso seja **verificável**, não uma promessa. Se algo aqui contradisser esses princípios, é bug — abra uma issue.
 
+## Segurança
+
+Leia isto antes de instalar — é curto e importa.
+
+**Instale apenas a partir deste repositório.** Este é o único endereço oficial:
+`github.com/FredericoTMello/poke-idle-companion`. Como a extensão é carregada da fonte (não há release nem instalador), qualquer um pode pegar este código, **modificá-lo para roubar sua conta** e distribuir com o mesmo nome. **Nunca** instale uma versão "pronta"/empacotada que alguém te mandar. Se veio de outro lugar, não é esta.
+
+**Por que uma versão adulterada seria perigosa:** o token que autentica você no jogo trafega na URL da conexão do jogo. Esta extensão **nunca lê nem envia esse token** — você pode conferir em [`extension/captura.js`](extension/captura.js), onde a única coisa feita com a conexão é *escutar* mensagens (`addEventListener('message', …)`), sem nenhum `.send(` e sem ler a URL. Uma cópia maliciosa poderia fazer o contrário e enviar seu token para fora, o que entregaria sua conta inteira. Por isso a fonte importa.
+
+**Como se proteger:**
+- Instale só deste repositório, e prefira ler o código antes (o formato "sem release" existe justamente para isso).
+- Desconfie de qualquer fork que peça permissões a mais ou que venha empacotado.
+- Se algo na extensão contradiz a seção [Princípios](#princípios--o-que-esta-extensão-nunca-fará), **não use e abra uma issue** — é o bug mais importante que existe aqui.
+
+**Reportar uma falha:** achou um jeito de esta extensão vazar dado ou agir no jogo? Abra uma issue (ou avise em particular, se for sensível). Levamos a sério.
+
 ## Sobre os dados do jogo
 
 O arquivo [`extension/dados-combate.js`](extension/dados-combate.js) contém stats de criaturas e a tabela de tipos, **propriedade da Quartzz Games LTDA**, extraídos do cliente público do jogo e incluídos apenas para a ferramenta funcionar offline. À disposição da equipe do jogo para remoção a qualquer momento.
