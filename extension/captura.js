@@ -58,6 +58,7 @@
   let hunt = null;
   let sujo = false;
   let shinyCaido = null;   // shiny derrubado esperando a bola
+  let avistadoShiny = null; // shiny na tela agora (para o alerta do painel)
 
   const num = v => typeof v === 'number' && isFinite(v);
 
@@ -202,6 +203,10 @@
           }
           if (mo.shiny && D.shinies.length < 2000) {
             D.shinies.push({ t: agora, especie: mo.speciesId, hunt, maxHp: mo.maxHp });
+            // Sinaliza para o painel: shiny na tela AGORA, para você não perder e
+            // tirar o print (Win+Shift+S). O jogo é WebGL, então não dá para a
+            // extensão capturar a imagem — mas dá para avisar na hora.
+            avistadoShiny = { t: agora, especie: mo.speciesId };
           }
           sujo = true;
         }
@@ -591,35 +596,56 @@
   const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const numero = n => Math.round(n).toLocaleString('pt-BR');
 
-  // Progresso até o próximo nível do pokémon ativo. O jogo só mostra "EXP 79%",
-  // mas a LARGURA da barra vem com 4 casas ("78.9299%") — precisão de sobra.
-  // Medimos a velocidade do próprio progresso em vez de tentar descobrir a curva
-  // de XP do jogo: menos suposição, e funciona igual em qualquer nível.
+  // XP absoluto do pokémon ATIVO. O jogo mostra "961 / 1884 XP" no card, e o card
+  // do ativo tem title "(ativo)"/"(active)". Ler o número exato é muito melhor que
+  // medir a velocidade da barra: aquela pegava a primeira barra da tela (podia ser
+  // de outro pokémon parado) e extrapolava um ritmo ruidoso — dava tempos absurdos.
+  function xpAbsolutoAtivo() {
+    try {
+      const nos = document.querySelectorAll('[title]');
+      for (const n of nos) {
+        if (!/\((ativo|active)\)/i.test(n.getAttribute('title') || '')) continue;
+        const m = (n.textContent || '').match(/([\d.,]+)\s*\/\s*([\d.,]+)/);
+        if (!m) continue;
+        const at = +m[1].replace(/[.,]/g, ''), nx = +m[2].replace(/[.,]/g, '');
+        if (nx > 0 && at >= 0 && at <= nx) return { atual: at, prox: nx, falta: nx - at };
+      }
+    } catch (e) { /* fora do navegador, ou o jogo mudou o layout */ }
+    return null;
+  }
+
+  // Largura da barra de EXP, com 4 casas ("78.9299%"). Fallback quando não achamos
+  // o número absoluto — menos confiável, então marcado.
   function progressoAtivo() {
     try {
-      const nos = document.querySelectorAll('*');
-      for (const n of nos) {
+      for (const n of document.querySelectorAll('*')) {
         if (!/^EXP\s+\d+%$/.test((n.textContent || '').trim())) continue;
         for (const f of n.querySelectorAll('*')) {
           const w = f.style && f.style.width;
           if (w && w.charAt(w.length - 1) === '%') return parseFloat(w);
         }
       }
-    } catch (e) { /* fora do navegador, ou o jogo mudou o layout */ }
+    } catch (e) { /* idem */ }
     return null;
   }
 
   let ancoraProg = null;
-  function faltaParaNivel() {
+  // Tempo até o próximo nível. Prefere XP absoluto ÷ XP/s MEDIDO (exato); só cai
+  // na velocidade-da-barra se não achar o número. `xpSeg` vem da medição de combate.
+  function faltaParaNivel(xpSeg) {
+    const abs = xpAbsolutoAtivo();
+    if (abs) {
+      const pct = 100 * abs.atual / abs.prox;
+      return { pct, falta: 100 - pct, exato: true,
+               seg: (xpSeg > 0) ? abs.falta / xpSeg : null };
+    }
     const pct = progressoAtivo();
     if (pct === null || !isFinite(pct)) return null;
     const agora = Date.now();
-    // Queda grande na porcentagem = subiu de nível. Recomeça a medir.
     if (!ancoraProg || pct < ancoraProg.pct - 5) ancoraProg = { pct, t: agora };
     const dp = pct - ancoraProg.pct, dt = (agora - ancoraProg.t) / 1000;
     const falta = 100 - pct;
-    // Menos de um minuto de janela não dá ritmo confiável — mostra só o quanto falta.
-    return { pct, falta, seg: (dp > 0 && dt >= 60) ? falta * dt / dp : null };
+    return { pct, falta, exato: false, seg: (dp > 0 && dt >= 60) ? falta * dt / dp : null };
   }
 
   // Resumo da sessão em texto, para o jogador colar no chat do jogo.
@@ -816,11 +842,21 @@
           ? ' · <b style="color:' + COR.med + '">✨ ' + D.shinies.length + '</b>'
           : '');
 
+      // Banner de shiny na tela: aparece por 30 s para você não perder e printar.
+      let bShiny = '';
+      if (avistadoShiny && Date.now() - avistadoShiny.t < 30000) {
+        const c = CRIATURAS.find(function (x) { return x.id === avistadoShiny.especie; });
+        bShiny = '<div style="background:' + COR.med + ';color:#0b0f14;font-weight:700;' +
+          'border-radius:6px;padding:5px 7px;margin-bottom:7px;font-size:11px;text-align:center">' +
+          '✨ SHINY NA TELA' + (c ? ' — ' + esc(c.nome) : '') + '<br>' +
+          '<span style="font-weight:400;font-size:10px">tire o print: Win+Shift+S</span></div>';
+      }
+
       const r = temDados ? ranking() : null;
       const aqui = q('piwAqui'), cacas = q('piwCacas');
       if (!r || !r.alvo) {
         resumo.textContent = 'sem alvo';
-        aqui.innerHTML = '<span style="color:' + COR.dim + '">esperando uma caça começar…</span>';
+        aqui.innerHTML = bShiny + '<span style="color:' + COR.dim + '">esperando uma caça começar…</span>';
         cacas.innerHTML = '';
         return;
       }
@@ -829,7 +865,7 @@
       const eu = r.itens.find(function (x) { return x.ativo; }) || r.itens[0];
       resumo.textContent = real ? numero(real.xps) + ' xp/s' : r.alvo.nome;
 
-      aqui.innerHTML =
+      aqui.innerHTML = bShiny +
         '<div style="display:flex;align-items:baseline;gap:6px">' +
           '<span style="font-weight:600">' + esc(r.alvo.nome) + '</span>' +
           '<span style="color:' + COR.dim + ';font-size:10px">' + numero(r.alvo.hp) + ' hp' + (r.alvo.hpMedido ? '' : ' ≈') + '</span>' +
@@ -842,7 +878,8 @@
               real.seg.toFixed(1) + 's por abate · ' + numero(real.abates) + ' medidos</div>'
           : '<div style="color:' + COR.dim + ';font-size:10px;margin-top:1px">medindo o ritmo…</div>') +
         (function () {
-          const p = faltaParaNivel();
+          // XP/s medido do combate: é o que sobe a barra do pokémon que caça.
+          const p = faltaParaNivel(real ? real.xps : 0);
           if (!p) return '';
           return '<div style="display:flex;align-items:baseline;gap:5px;margin-top:5px">' +
             '<div style="flex:1;height:3px;background:' + COR.linha + ';border-radius:2px;overflow:hidden">' +

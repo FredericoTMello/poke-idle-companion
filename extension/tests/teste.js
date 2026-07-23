@@ -45,7 +45,14 @@ const doc = {
 // barra de EXP como o jogo monta: texto "EXP 79%" com a largura em 4 casas
 const barraExp = pct => [{
   textContent: 'EXP ' + Math.round(pct) + '%',
+  getAttribute: () => null,
   querySelectorAll: () => [{ style: { width: pct.toFixed(4) + '%' } }],
+}];
+// card do pokémon ativo: title "(ativo)" e texto com o XP absoluto "atual/necessário"
+const cardAtivo = (atual, prox) => [{
+  getAttribute: k => (k === 'title' ? 'Exeggcute (ativo)' : null),
+  textContent: 'Exeggcute Lv.92 ' + atual + '/' + prox + ' EXP',
+  querySelectorAll: () => [],
 }];
 const ctx = vm.createContext(Object.assign(janela, {
   document: doc, console, Date, Math, JSON, Object, Array, isFinite, setInterval: () => 0,
@@ -275,6 +282,17 @@ doc.nos = barraExp(83.9299);
 const p2 = ctx.__piwColetor.faltaNivel();
 t('estima o tempo pelo ritmo medido', p2 && Math.abs(p2.seg - 1928.4) < 5,
   p2 && p2.seg && (p2.seg / 60).toFixed(1) + ' min');
+
+// caminho preferido: XP absoluto do card do ativo ÷ XP/s medido = tempo EXATO.
+// Foi o que consertou o "1h23 errado" — antes eu extrapolava a velocidade da
+// barra (frágil, e às vezes a barra de outro pokémon).
+doc.nos = cardAtivo(961, 1884);        // faltam 923 XP
+const pAbs = ctx.__piwColetor.faltaNivel(100);   // 100 XP/s medido -> 9,23 s
+t('usa o XP absoluto do card do ativo', pAbs && pAbs.exato === true, pAbs && 'exato=' + pAbs.exato);
+t('tempo = XP que falta / XP por segundo', pAbs && Math.abs(pAbs.seg - 9.23) < 0.001,
+  pAbs && pAbs.seg.toFixed(2) + 's');
+t('pct vem do XP absoluto', pAbs && Math.abs(pAbs.pct - 100 * 961 / 1884) < 0.001, pAbs && pAbs.pct.toFixed(1) + '%');
+t('sem XP/s medido nao chuta tempo', ctx.__piwColetor.faltaNivel(0).seg === null);
 
 // subiu de nível: a porcentagem despenca e a medição recomeça do zero
 ctx.Date = { now: () => relogioProg + 660000 };
