@@ -42,23 +42,18 @@ const doc = {
   nos: [],
   querySelectorAll() { return doc.nos; },
 };
-// barra de EXP como o jogo monta: texto "EXP 79%" com a largura em 4 casas
-const barraExp = pct => [{
-  textContent: 'EXP ' + Math.round(pct) + '%',
-  getAttribute: () => null,
-  querySelectorAll: () => [{ style: { width: pct.toFixed(4) + '%' } }],
-}];
-// card do pokémon ativo: title "(ativo)", contendo a barra de HP e a barra de EXP.
-// Durante a caça o jogo NÃO mostra o XP como texto "X/Y" — só a barra "EXP <pct>%".
-// O card tem o HP como "1620/1620" (era o que a versão anterior pegava por engano).
-const barraDe = (rotulo, pct) => ({
-  textContent: rotulo + ' ' + Math.round(pct) + '%',
-  querySelectorAll: () => [{ style: { width: pct.toFixed(4) + '%' } }],
-});
+// card do pokémon ativo, fiel ao DOM real: o texto agregado traz o HP como "X/Y"
+// e o texto "EXP <n>%", e há DUAS barras .sbar-fill achatadas em querySelectorAll('*')
+// — a de HP (que oscila na luta) e a de EXP. A versão anterior pegava "a primeira
+// com width%" e acertava o HP (59%) achando que era EXP — o bug do tempo errado.
+// Agora o código lê o inteiro "EXP <n>%" e escolhe a barra cuja largura bate.
 const cardAtivo = pctExp => [{
-  getAttribute: k => (k === 'title' ? 'Exeggcute (ativo)' : null),
-  textContent: 'Exeggcute Lv.92 1620/1620',   // HP como "X/Y", sem XP em texto
-  querySelectorAll: () => [barraDe('HP', 100), barraDe('EXP', pctExp)],
+  getAttribute: k => (k === 'title' ? 'Exeggutor (ativo)' : null),
+  textContent: 'Exeggutor Lv.125 2289/3852 EXP ' + Math.round(pctExp) + '%',
+  querySelectorAll: () => [
+    { style: { width: '59.4200%' } },          // HP — NÃO deve ser escolhida
+    { style: { width: pctExp.toFixed(4) + '%' } }, // EXP
+  ],
 }];
 const ctx = vm.createContext(Object.assign(janela, {
   document: doc, console, Date, Math, JSON, Object, Array, isFinite, setInterval: () => 0,
@@ -268,34 +263,34 @@ t('marca que a lista foi calibrada', ancora && ancora.linha.calibrado === true,
 const ordemOk = csCal.every((x, i) => i === 0 || x.letal || csCal[i - 1].letal || csCal[i - 1].xps >= x.xps);
 t('calibracao nao bagunca a ordem', ordemOk);
 
-// ---- quanto falta para o próximo nível ----
-// O jogo não mostra o XP em texto durante a caça — só a barra "EXP <pct>%".
-// Lemos a largura dessa barra DENTRO do card do ativo e medimos sua velocidade.
+// ---- quanto falta para o próximo nível, EM NÚMERO ----
+// O jogo não mostra o XP em texto durante a caça — só a barra "EXP <pct>%". Mas
+// cada abate rende um xpGained conhecido e empurra a barra: com os dois medimos o
+// XP TOTAL do nível e traduzimos "quanto falta" em XP e abates. (Validado no jogo.)
 doc.nos = [];
 t('sem card ativo na tela, nao inventa', ctx.__piwColetor.faltaNivel() === null);
 
-const relogioProg = DateReal.now();
-ctx.Date = { now: () => relogioProg };
-doc.nos = cardAtivo(78.9299);          // barra EXP em 78,93% (e HP em 100%)
+doc.nos = cardAtivo(78.9299);          // EXP em 78,93%; o card também tem HP em 59,42%
 const p1 = ctx.__piwColetor.faltaNivel();
-t('le a barra EXP do card ativo, nao a de HP', p1 && Math.abs(p1.pct - 78.9299) < 0.0001, p1 && p1.pct);
-t('calcula o quanto falta', p1 && Math.abs(p1.falta - 21.0701) < 0.0001, p1 && p1.falta.toFixed(4) + '%');
-t('sem janela (<60s) nao chuta tempo', p1 && p1.seg === null);
+t('le a barra EXP do card ativo, nao a de HP (59%)', p1 && Math.abs(p1.pct - 78.9299) < 0.0001, p1 && p1.pct);
+t('calcula o quanto falta em %', p1 && Math.abs(p1.falta - 21.0701) < 0.0001, p1 && p1.falta.toFixed(4) + '%');
+t('sem span medido ainda, nao chuta XP', p1 && p1.faltaXp === null);
 
-// 10 min depois a barra subiu 5 pontos: sobram 16,07 a 5/600s = ~32 min
-ctx.Date = { now: () => relogioProg + 600000 };
-doc.nos = cardAtivo(83.9299);
-const p2 = ctx.__piwColetor.faltaNivel();
-t('estima o tempo pela velocidade da barra', p2 && Math.abs(p2.seg - 1928.4) < 5,
-  p2 && p2.seg && (p2.seg / 60).toFixed(1) + ' min');
+// mede o span: o 1º abate ancora a barra; abates seguintes que a avançam ≥3%
+// publicam o XP do nível = xp acumulado ÷ fração da barra preenchida.
+doc.nos = cardAtivo(40);
+ws.receber({ type: 'field-kill', speciesName: 'Golem', xpGained: 0 });     // ancora em 40%
+doc.nos = cardAtivo(46);
+ws.receber({ type: 'field-kill', speciesName: 'Golem', xpGained: 8000 });  // +8000 xp em +6% ⇒ span 133.333
+const p4 = ctx.__piwColetor.faltaNivel();
+t('mede o XP total do nivel pela barra + xpGained', p4 && Math.abs(p4.spanXp - 133333) < 200, p4 && Math.round(p4.spanXp));
+t('traduz "quanto falta" em XP', p4 && Math.abs(p4.faltaXp - 72000) < 200, p4 && Math.round(p4.faltaXp));
 
-// subiu de nível: a barra despenca e a medição recomeça do zero
-ctx.Date = { now: () => relogioProg + 660000 };
+// subiu de nível: a barra despenca; a âncora reinicia para não misturar níveis.
 doc.nos = cardAtivo(2.5);
-const p3 = ctx.__piwColetor.faltaNivel();
-t('level up reinicia a medicao', p3 && p3.seg === null && Math.abs(p3.pct - 2.5) < 0.001,
-  p3 && p3.pct + '% / seg ' + p3.seg);
-ctx.Date = DateReal;
+const p5 = ctx.__piwColetor.faltaNivel();
+t('level up: le a nova barra baixa', p5 && Math.abs(p5.pct - 2.5) < 0.001, p5 && p5.pct + '%');
+doc.nos = [];
 doc.nos = [];
 
 // ---- desfecho do shiny ----

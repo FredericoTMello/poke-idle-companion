@@ -163,6 +163,8 @@
         const k = m.speciesName || '?';
         const e = D.kills[k] || (D.kills[k] = { n: 0, xpTotal: 0, partes: null, ritmo: {} });
         e.n++; e.xpTotal += m.xpGained || 0;
+        // Cada abate move a barra de EXP: usa o xpGained para medir o XP/nível.
+        registrarProgresso(m.xpGained || 0);
         if (m.xpParts && !e.partes) e.partes = m.xpParts;
         // Ritmo real de abate, por atacante+nível. Medir é obrigatório porque a
         // espera de respawn varia por mapa (6,2 s no Magnemite, 3,5 s no Onix,
@@ -603,40 +605,62 @@
   const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const numero = n => Math.round(n).toLocaleString('pt-BR');
 
-  // Barra de EXP do pokémon ATIVO. Durante a caça o jogo NÃO mostra o XP como
-  // texto "atual/necessário" — só uma barra "EXP <pct>%". O único "X/Y" em texto
-  // é o HP, e foi ele que a tentativa anterior pegava por engano (dava tempo ~0).
-  // Por isso lemos a LARGURA da barra, restrita ao card do ativo (title "(ativo)")
-  // para não pegar a barra de outro pokémon parado — que dava o "1h23" errado.
+  // Barra de EXP do pokémon ATIVO. Durante a caça o jogo não mostra o XP como
+  // texto "atual/necessário" — mostra o texto "EXP <n>%" e uma barra. O card tem
+  // DUAS barras .sbar-fill (HP e EXP); a de HP oscila na luta, e pegar "a primeira
+  // com width%" pegava o HP (era esse o bug do tempo errado: HP 59% virava "EXP").
+  // Solução: ler o inteiro do texto "EXP <n>%" e escolher a barra cuja largura
+  // bate com ele — a largura em % é fina (ex.: 89,95) e o texto (90) desempata.
   function progressoAtivo() {
     try {
       for (const card of document.querySelectorAll('[title]')) {
         if (!/\((ativo|active)\)/i.test(card.getAttribute('title') || '')) continue;
-        // dentro do card, a barra ligada ao texto "EXP" (não a barra de HP)
-        for (const n of card.querySelectorAll('*')) {
-          if (!/EXP\s*\d/i.test(n.textContent || '')) continue;
-          for (const f of n.querySelectorAll('*')) {
-            const w = f.style && f.style.width;
-            if (w && w.charAt(w.length - 1) === '%') return parseFloat(w);
-          }
+        const m = (card.textContent || '').match(/EXP\s*(\d+)\s*%/i);
+        if (!m) continue;
+        const alvo = +m[1];
+        let melhor = null, dif = Infinity;
+        for (const el of card.querySelectorAll('*')) {
+          const w = el.style && el.style.width;
+          if (!w || w.charAt(w.length - 1) !== '%') continue;
+          const v = parseFloat(w);
+          if (isFinite(v) && Math.abs(v - alvo) < dif) { dif = Math.abs(v - alvo); melhor = v; }
         }
+        // Largura casa com o texto: usa a fina. Senão, o inteiro do texto já serve.
+        return (melhor !== null && dif < 3) ? melhor : alvo;
       }
     } catch (e) { /* fora do navegador, ou o jogo mudou o layout */ }
     return null;
   }
 
-  let ancoraProg = null;
-  // Tempo até o próximo nível pela VELOCIDADE da barra do card ativo: sem o XP
-  // absoluto (que o jogo não expõe em texto durante a caça), medir o avanço da
-  // própria barra é a única via honesta. Marcado com ≈ porque é estimativa.
+  // Estimativa do XP TOTAL do nível atual, medida ao vivo: cada abate rende um
+  // xpGained conhecido (mensagem field-kill) e empurra a barra um tanto medível.
+  // span = XP acumulado desde a âncora ÷ fração da barra que ele preencheu.
+  // Não usa o XP absoluto e é imune ao HP; validado no jogo (~814k p/ o nv125,
+  // 5 abates de Golem ⇒ 3,5% da barra).
+  let progAncora = null;   // {pct, xpAcc, nivel}
+  let spanNivel = null;    // XP total estimado do nível do ativo
+  function registrarProgresso(xpGanho) {
+    const pct = progressoAtivo();
+    if (pct === null || !isFinite(pct)) return;
+    const nv = ativo ? ativo.nivel : null;
+    // Primeiro dado, troca de nível, ou a barra deu a volta (subiu de nível): reancora.
+    if (!progAncora || progAncora.nivel !== nv || pct < progAncora.pct - 2) {
+      progAncora = { pct, xpAcc: 0, nivel: nv };
+      return;
+    }
+    progAncora.xpAcc += xpGanho;
+    const dp = pct - progAncora.pct;
+    // Só publica com avanço ≥3% da barra: divisão por Δ pequeno amplia o ruído.
+    if (dp >= 3 && progAncora.xpAcc > 0) spanNivel = progAncora.xpAcc / (dp / 100);
+  }
+
+  // Quanto falta para o próximo nível, EM NÚMERO. A barra dá o %, o span dá o XP
+  // total do nível; o tempo e o nº de abates o painel calcula com o xp/s medido.
   function faltaParaNivel() {
     const pct = progressoAtivo();
     if (pct === null || !isFinite(pct)) return null;
-    const agora = Date.now();
-    if (!ancoraProg || pct < ancoraProg.pct - 5) ancoraProg = { pct, t: agora };
-    const dp = pct - ancoraProg.pct, dt = (agora - ancoraProg.t) / 1000;
     const falta = 100 - pct;
-    return { pct, falta, exato: false, seg: (dp > 0 && dt >= 60) ? falta * dt / dp : null };
+    return { pct, falta, spanXp: spanNivel, faltaXp: spanNivel ? spanNivel * falta / 100 : null };
   }
 
   // Resumo da sessão em texto, para o jogador colar no chat do jogo.
@@ -871,12 +895,21 @@
         (function () {
           const p = faltaParaNivel();
           if (!p) return '';
+          // Com o span medido e o xp/s do alvo, o "quanto falta" vira número:
+          // tempo · XP que falta · nº de abates. Sem span ainda, mostra só o %.
+          let dir = p.falta.toFixed(1) + '%';
+          let cor = COR.dim;
+          if (p.faltaXp && real && real.xps > 0) {
+            const seg = p.faltaXp / real.xps;
+            const ab = Math.max(1, Math.round(p.faltaXp / (real.xps * real.seg)));
+            dir = tempo(seg) + ' · ' + numero(p.faltaXp) + ' xp · ' + ab + (ab === 1 ? ' abate' : ' abates');
+            cor = COR.med;
+          }
           return '<div style="display:flex;align-items:baseline;gap:5px;margin-top:5px">' +
             '<div style="flex:1;height:3px;background:' + COR.linha + ';border-radius:2px;overflow:hidden">' +
               '<div style="width:' + p.pct.toFixed(1) + '%;height:100%;background:' + COR.med + '"></div></div>' +
-            '<span style="color:' + COR.dim + ';font-size:10px;font-family:' + MONO + '">' +
-              (p.seg ? tempo(p.seg) : p.falta.toFixed(1) + '%') +
-              (ativo ? ' p/ nv' + (ativo.nivel + 1) : ' p/ subir') +
+            '<span style="color:' + cor + ';font-size:10px;font-family:' + MONO + '">' +
+              dir + (ativo ? ' p/ nv' + (ativo.nivel + 1) : ' p/ subir') +
             '</span></div>';
         })() +
         (eu
