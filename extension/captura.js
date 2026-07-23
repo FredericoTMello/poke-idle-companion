@@ -38,6 +38,7 @@
     meusPokemon: {},   // id -> ultimo estado (nivel, stats, qualidade, iv)
     cruas: [],         // janela deslizante de golpes DADOS, com carimbo de tempo
     cruasRecebidas: [], // idem para golpes RECEBIDOS: mede a cadência do inimigo
+    amostraPoke: null, // 1º pokémon do time cru — revela se o socket manda o XP
     minutosAtivos: 0,
   });
 
@@ -95,6 +96,12 @@
   // ---- identificação do pokémon ativo ----
   function guardaPoke(p) {
     if (!p || !p.id) return;
+    // Amostra CRUA do objeto do pokémon do time — uma só. É a evidência que falta
+    // para saber se o socket manda o XP atual/necessário (o DOM logado não é
+    // alcançável pelas ferramentas). Baixar → mandar o JSON revela todos os campos.
+    if (!D.amostraPoke && (p.team || p.leader)) {
+      try { D.amostraPoke = JSON.parse(JSON.stringify(p)); } catch (e) {}
+    }
     D.meusPokemon[p.id] = {
       nome: p.name, especie: p.speciesId, nivel: p.level, stats: p.stats || null,
       qualidade: p.quality, ivTotal: p.ivTotal, power: p.power, maxHp: p.maxHp,
@@ -596,51 +603,33 @@
   const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const numero = n => Math.round(n).toLocaleString('pt-BR');
 
-  // XP absoluto do pokémon ATIVO. O jogo mostra "961 / 1884 XP" no card, e o card
-  // do ativo tem title "(ativo)"/"(active)". Ler o número exato é muito melhor que
-  // medir a velocidade da barra: aquela pegava a primeira barra da tela (podia ser
-  // de outro pokémon parado) e extrapolava um ritmo ruidoso — dava tempos absurdos.
-  function xpAbsolutoAtivo() {
+  // Barra de EXP do pokémon ATIVO. Durante a caça o jogo NÃO mostra o XP como
+  // texto "atual/necessário" — só uma barra "EXP <pct>%". O único "X/Y" em texto
+  // é o HP, e foi ele que a tentativa anterior pegava por engano (dava tempo ~0).
+  // Por isso lemos a LARGURA da barra, restrita ao card do ativo (title "(ativo)")
+  // para não pegar a barra de outro pokémon parado — que dava o "1h23" errado.
+  function progressoAtivo() {
     try {
-      const nos = document.querySelectorAll('[title]');
-      for (const n of nos) {
-        if (!/\((ativo|active)\)/i.test(n.getAttribute('title') || '')) continue;
-        // Ancorar em "…/… XP": o card tem VÁRIOS "X/Y" (HP cheio 1620/1620 vinha
-        // ANTES do XP e era pego por engano, dando falta zero -> tempo ~0s).
-        const m = (n.textContent || '').match(/([\d.,]+)\s*\/\s*([\d.,]+)\s*E?XP/i);
-        if (!m) continue;
-        const at = +m[1].replace(/[.,]/g, ''), nx = +m[2].replace(/[.,]/g, '');
-        if (nx > 0 && at >= 0 && at <= nx) return { atual: at, prox: nx, falta: nx - at };
+      for (const card of document.querySelectorAll('[title]')) {
+        if (!/\((ativo|active)\)/i.test(card.getAttribute('title') || '')) continue;
+        // dentro do card, a barra ligada ao texto "EXP" (não a barra de HP)
+        for (const n of card.querySelectorAll('*')) {
+          if (!/EXP\s*\d/i.test(n.textContent || '')) continue;
+          for (const f of n.querySelectorAll('*')) {
+            const w = f.style && f.style.width;
+            if (w && w.charAt(w.length - 1) === '%') return parseFloat(w);
+          }
+        }
       }
     } catch (e) { /* fora do navegador, ou o jogo mudou o layout */ }
     return null;
   }
 
-  // Largura da barra de EXP, com 4 casas ("78.9299%"). Fallback quando não achamos
-  // o número absoluto — menos confiável, então marcado.
-  function progressoAtivo() {
-    try {
-      for (const n of document.querySelectorAll('*')) {
-        if (!/^EXP\s+\d+%$/.test((n.textContent || '').trim())) continue;
-        for (const f of n.querySelectorAll('*')) {
-          const w = f.style && f.style.width;
-          if (w && w.charAt(w.length - 1) === '%') return parseFloat(w);
-        }
-      }
-    } catch (e) { /* idem */ }
-    return null;
-  }
-
   let ancoraProg = null;
-  // Tempo até o próximo nível. Prefere XP absoluto ÷ XP/s MEDIDO (exato); só cai
-  // na velocidade-da-barra se não achar o número. `xpSeg` vem da medição de combate.
-  function faltaParaNivel(xpSeg) {
-    const abs = xpAbsolutoAtivo();
-    if (abs) {
-      const pct = 100 * abs.atual / abs.prox;
-      return { pct, falta: 100 - pct, exato: true,
-               seg: (xpSeg > 0) ? abs.falta / xpSeg : null };
-    }
+  // Tempo até o próximo nível pela VELOCIDADE da barra do card ativo: sem o XP
+  // absoluto (que o jogo não expõe em texto durante a caça), medir o avanço da
+  // própria barra é a única via honesta. Marcado com ≈ porque é estimativa.
+  function faltaParaNivel() {
     const pct = progressoAtivo();
     if (pct === null || !isFinite(pct)) return null;
     const agora = Date.now();
@@ -880,8 +869,7 @@
               real.seg.toFixed(1) + 's por abate · ' + numero(real.abates) + ' medidos</div>'
           : '<div style="color:' + COR.dim + ';font-size:10px;margin-top:1px">medindo o ritmo…</div>') +
         (function () {
-          // XP/s medido do combate: é o que sobe a barra do pokémon que caça.
-          const p = faltaParaNivel(real ? real.xps : 0);
+          const p = faltaParaNivel();
           if (!p) return '';
           return '<div style="display:flex;align-items:baseline;gap:5px;margin-top:5px">' +
             '<div style="flex:1;height:3px;background:' + COR.linha + ';border-radius:2px;overflow:hidden">' +

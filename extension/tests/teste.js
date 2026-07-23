@@ -48,12 +48,17 @@ const barraExp = pct => [{
   getAttribute: () => null,
   querySelectorAll: () => [{ style: { width: pct.toFixed(4) + '%' } }],
 }];
-// card do pokémon ativo: title "(ativo)". O HP cheio (1620/1620) vem ANTES do XP
-// de propósito — é o número que era pego por engano e dava falta zero.
-const cardAtivo = (atual, prox) => [{
+// card do pokémon ativo: title "(ativo)", contendo a barra de HP e a barra de EXP.
+// Durante a caça o jogo NÃO mostra o XP como texto "X/Y" — só a barra "EXP <pct>%".
+// O card tem o HP como "1620/1620" (era o que a versão anterior pegava por engano).
+const barraDe = (rotulo, pct) => ({
+  textContent: rotulo + ' ' + Math.round(pct) + '%',
+  querySelectorAll: () => [{ style: { width: pct.toFixed(4) + '%' } }],
+});
+const cardAtivo = pctExp => [{
   getAttribute: k => (k === 'title' ? 'Exeggcute (ativo)' : null),
-  textContent: 'Exeggcute Lv.92 1620/1620 HP ' + atual + '/' + prox + ' EXP 27%',
-  querySelectorAll: () => [],
+  textContent: 'Exeggcute Lv.92 1620/1620',   // HP como "X/Y", sem XP em texto
+  querySelectorAll: () => [barraDe('HP', 100), barraDe('EXP', pctExp)],
 }];
 const ctx = vm.createContext(Object.assign(janela, {
   document: doc, console, Date, Math, JSON, Object, Array, isFinite, setInterval: () => 0,
@@ -264,44 +269,29 @@ const ordemOk = csCal.every((x, i) => i === 0 || x.letal || csCal[i - 1].letal |
 t('calibracao nao bagunca a ordem', ordemOk);
 
 // ---- quanto falta para o próximo nível ----
-// O jogo só mostra "EXP 79%", mas a largura da barra tem 4 casas. Medimos a
-// velocidade do próprio progresso — não precisamos da curva de XP do jogo.
+// O jogo não mostra o XP em texto durante a caça — só a barra "EXP <pct>%".
+// Lemos a largura dessa barra DENTRO do card do ativo e medimos sua velocidade.
 doc.nos = [];
-t('sem barra de EXP na tela, nao inventa', ctx.__piwColetor.faltaNivel() === null);
+t('sem card ativo na tela, nao inventa', ctx.__piwColetor.faltaNivel() === null);
 
 const relogioProg = DateReal.now();
 ctx.Date = { now: () => relogioProg };
-doc.nos = barraExp(78.9299);
+doc.nos = cardAtivo(78.9299);          // barra EXP em 78,93% (e HP em 100%)
 const p1 = ctx.__piwColetor.faltaNivel();
-t('le a barra com as 4 casas', p1 && Math.abs(p1.pct - 78.9299) < 0.0001, p1 && p1.pct);
+t('le a barra EXP do card ativo, nao a de HP', p1 && Math.abs(p1.pct - 78.9299) < 0.0001, p1 && p1.pct);
 t('calcula o quanto falta', p1 && Math.abs(p1.falta - 21.0701) < 0.0001, p1 && p1.falta.toFixed(4) + '%');
-t('sem janela nao chuta tempo', p1 && p1.seg === null);
+t('sem janela (<60s) nao chuta tempo', p1 && p1.seg === null);
 
-// 10 min depois subiu 5 pontos: sobram 16,07 pontos a 5 pontos por 600 s = ~32 min
+// 10 min depois a barra subiu 5 pontos: sobram 16,07 a 5/600s = ~32 min
 ctx.Date = { now: () => relogioProg + 600000 };
-doc.nos = barraExp(83.9299);
+doc.nos = cardAtivo(83.9299);
 const p2 = ctx.__piwColetor.faltaNivel();
-t('estima o tempo pelo ritmo medido', p2 && Math.abs(p2.seg - 1928.4) < 5,
+t('estima o tempo pela velocidade da barra', p2 && Math.abs(p2.seg - 1928.4) < 5,
   p2 && p2.seg && (p2.seg / 60).toFixed(1) + ' min');
 
-// caminho preferido: XP absoluto do card do ativo ÷ XP/s medido = tempo EXATO.
-// Foi o que consertou o "1h23 errado" — antes eu extrapolava a velocidade da
-// barra (frágil, e às vezes a barra de outro pokémon).
-doc.nos = cardAtivo(961, 1884);        // faltam 923 XP
-const pAbs = ctx.__piwColetor.faltaNivel(100);   // 100 XP/s medido -> 9,23 s
-t('usa o XP absoluto do card do ativo', pAbs && pAbs.exato === true, pAbs && 'exato=' + pAbs.exato);
-// se pegasse o HP cheio (1620/1620), pct seria 100% e o tempo 0. Pegando o XP
-// (961/1884), pct ~51% e tempo 9,23s. É o teste que reproduz o bug do "0,2s".
-t('pega o XP, nao o HP cheio que vem antes', pAbs && pAbs.seg > 1 && Math.abs(pAbs.pct - 51.0085) < 0.01,
-  pAbs && 'pct ' + pAbs.pct.toFixed(1) + '% seg ' + pAbs.seg.toFixed(2));
-t('tempo = XP que falta / XP por segundo', pAbs && Math.abs(pAbs.seg - 9.23) < 0.001,
-  pAbs && pAbs.seg.toFixed(2) + 's');
-t('pct vem do XP absoluto', pAbs && Math.abs(pAbs.pct - 100 * 961 / 1884) < 0.001, pAbs && pAbs.pct.toFixed(1) + '%');
-t('sem XP/s medido nao chuta tempo', ctx.__piwColetor.faltaNivel(0).seg === null);
-
-// subiu de nível: a porcentagem despenca e a medição recomeça do zero
+// subiu de nível: a barra despenca e a medição recomeça do zero
 ctx.Date = { now: () => relogioProg + 660000 };
-doc.nos = barraExp(2.5);
+doc.nos = cardAtivo(2.5);
 const p3 = ctx.__piwColetor.faltaNivel();
 t('level up reinicia a medicao', p3 && p3.seg === null && Math.abs(p3.pct - 2.5) < 0.001,
   p3 && p3.pct + '% / seg ' + p3.seg);
