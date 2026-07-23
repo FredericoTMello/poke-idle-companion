@@ -620,8 +620,8 @@
   const gravaPref = () => { try { localStorage.setItem(UI, JSON.stringify(pref)); } catch (e) {} };
 
   const MONO = 'ui-monospace,Menlo,Consolas,monospace';
-  const COR = { fundo: '#0b0f14', sup: '#121a23', linha: '#1c2836',
-                txt: '#dde6f0', dim: '#67788c', med: '#ffb340', letal: '#ff6b6b' };
+  const COR = { fundo: '#0a0e13', sup: '#0f1620', linha: '#1e2a38', trilho: '#17212d',
+                txt: '#e6edf5', dim: '#6b7d8f', med: '#ffb648', modelo: '#66b8db', letal: '#ff6b6b' };
   const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const numero = n => Math.round(n).toLocaleString('pt-BR');
 
@@ -797,29 +797,33 @@
     el.id = 'piw';
     el.style.cssText = 'position:fixed;z-index:2147483647;width:264px;' +
       'background:' + COR.fundo + ';color:' + COR.txt + ';border:1px solid ' + COR.linha + ';' +
-      'border-radius:10px;font:11.5px/1.45 system-ui,-apple-system,sans-serif;' +
-      'box-shadow:0 10px 34px rgba(0,0,0,.55);overflow:hidden;font-variant-numeric:tabular-nums';
+      'border-radius:12px;font:11.5px/1.45 system-ui,-apple-system,sans-serif;' +
+      'box-shadow:0 12px 30px rgba(0,0,0,.5);overflow:hidden;font-variant-numeric:tabular-nums';
+    const btn = 'background:none;border:1px solid ' + COR.linha + ';color:' + COR.dim +
+      ';border-radius:6px;padding:2px 8px;cursor:pointer;font:inherit;font-size:10.5px';
     el.innerHTML =
-      '<div id="piwCab" style="display:flex;align-items:center;gap:7px;padding:8px 10px;' +
+      '<div id="piwCab" style="display:flex;align-items:center;gap:8px;padding:9px 11px;' +
         'background:' + COR.sup + ';border-bottom:1px solid ' + COR.linha + ';cursor:grab;user-select:none">' +
-        '<span style="width:6px;height:6px;border-radius:50%;background:' + COR.med + ';flex:none"></span>' +
-        '<span style="font-weight:600">Caça</span>' +
-        '<span id="piwResumo" style="margin-left:auto;font-family:' + MONO + ';color:' + COR.dim + ';font-size:11px"></span>' +
+        '<span style="width:7px;height:7px;border-radius:50%;background:' + COR.med + ';flex:none;box-shadow:0 0 0 3px rgba(255,182,72,.18)"></span>' +
+        '<span style="font:600 10px ' + MONO + ';letter-spacing:.18em;color:' + COR.dim + '">CAÇA</span>' +
+        '<span id="piwResumo" style="margin-left:auto;font-family:' + MONO + ';color:' + COR.med + ';font-size:12px;font-weight:600"></span>' +
         '<button id="piwDobra" style="background:none;border:0;color:' + COR.dim + ';cursor:pointer;font:inherit;padding:0 2px;line-height:1">–</button>' +
       '</div>' +
       '<div id="piwCorpo">' +
-        '<div id="piwAqui" style="padding:9px 10px"></div>' +
-        '<div id="piwCacas" style="padding:0 10px 9px"></div>' +
-        '<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;' +
-          'border-top:1px solid ' + COR.linha + ';color:' + COR.dim + ';font-size:10.5px">' +
-          '<span id="piwConta" style="font-family:' + MONO + '"></span>' +
-          '<button id="piwCopiar" style="margin-left:auto;background:none;border:1px solid ' + COR.linha +
-            ';color:' + COR.dim + ';border-radius:5px;padding:2px 7px;cursor:pointer;font:inherit"' +
+        '<div id="piwAqui" style="padding:11px 11px 9px"></div>' +
+        '<div id="piwCacas" style="padding:0 11px 10px"></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 11px;' +
+          'border-top:1px solid ' + COR.linha + ';background:' + COR.sup + ';color:' + COR.dim + ';font-size:10px;font-family:' + MONO + '">' +
+          '<span id="piwConta"></span>' +
+          '<button id="piwCopiar" style="margin-left:auto;' + btn + '"' +
             ' title="copia o resumo da sessão para você colar no chat">Copiar</button>' +
-          '<button id="piwBaixar" style="background:none;border:1px solid ' + COR.linha +
-            ';color:' + COR.dim + ';border-radius:5px;padding:2px 7px;cursor:pointer;font:inherit">Baixar</button>' +
-          '<button id="piwZerar" style="background:none;border:1px solid ' + COR.linha +
-            ';color:' + COR.dim + ';border-radius:5px;padding:2px 7px;cursor:pointer;font:inherit">Zerar</button>' +
+          '<button id="piwBaixar" style="' + btn + '">Baixar</button>' +
+          '<button id="piwZerar" style="' + btn + '">Zerar</button>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:12px;padding:6px 11px;' +
+          'border-top:1px solid ' + COR.linha + ';font-size:10px;color:' + COR.dim + ';font-family:' + MONO + '">' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:' + COR.med + '"></span>medido</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:' + COR.modelo + '"></span>estimado</span>' +
         '</div>' +
       '</div>';
     document.body.appendChild(el);
@@ -890,7 +894,7 @@
       D = vazio(); sujo = true; salvar();
     });
 
-    function linhaCaca(c) {
+    function linhaCaca(c, maxXps) {
       const marca = c.letal
         ? '<span style="color:' + COR.letal + '" title="a luta dura mais do que você aguenta em pé">☠</span>'
         : c.quaseEmpate
@@ -898,11 +902,14 @@
           : !c.enfrentado
             ? '<span style="color:' + COR.dim + '" title="você nunca caçou aqui: risco não medido">·</span>'
             : '';
-      return '<div style="display:flex;gap:6px;align-items:baseline;padding:2.5px 0">' +
-        '<span>' + esc(c.nome) + '</span>' +
+      // Barra proporcional ao xp/s — em ciano porque é xp/s de MODELO, não medido.
+      const w = maxXps > 0 ? Math.max(4, Math.min(100, c.xps / maxXps * 100)) : 0;
+      return '<div style="display:flex;gap:8px;align-items:center;padding:3px 0">' +
+        '<span style="min-width:54px">' + esc(c.nome) + '</span>' +
         '<span style="color:' + COR.dim + ';font-size:10px">nv' + c.nivel + '</span>' + marca +
-        '<span style="margin-left:auto;font-family:' + MONO + '">' + numero(c.xps) +
-          '<span style="color:' + COR.dim + ';font-size:9.5px"> xp/s</span></span></div>';
+        '<div style="flex:1;height:4px;background:' + COR.trilho + ';border-radius:3px;overflow:hidden">' +
+          '<div style="width:' + w.toFixed(0) + '%;height:100%;background:' + COR.modelo + ';opacity:.7;border-radius:3px"></div></div>' +
+        '<span style="font-family:' + MONO + ';font-size:11px;width:36px;text-align:right;color:' + COR.txt + '">' + numero(c.xps) + '</span></div>';
     }
 
     function pintar() {
@@ -936,20 +943,45 @@
 
       const real = xpPorSegMedido(r.alvo);
       const eu = r.itens.find(function (x) { return x.ativo; }) || r.itens[0];
-      resumo.textContent = real ? numero(real.xps) + ' xp/s' : r.alvo.nome;
+      resumo.textContent = real ? numero(real.xps) + ' xp/s' : '—';
+
+      // Ranking: onde esta caça fica entre as que você ALCANÇA (alimenta a régua).
+      const lista = temDados ? melhoresCacas(400) : null;
+      const atual = lista ? lista.find(function (c) { return c.nome === r.alvo.nome; }) : null;
+      const outros = lista ? lista.filter(function (c) { return c.nome !== r.alvo.nome; }) : [];
+      const aquiXps = real ? real.xps : (atual ? atual.xps : 0);
+      const melhores = outros.filter(function (c) { return c.xps > aquiXps * 1.05; });
+      const ganho = melhores.length && aquiXps > 0 ? melhores[0].xps / aquiXps : null;
+      const topXps = Math.max.apply(null, [aquiXps, 1].concat(outros.map(function (c) { return c.xps; })));
+      const posRail = Math.max(6, Math.min(100, aquiXps / topXps * 100));
 
       aqui.innerHTML = bShiny +
-        '<div style="display:flex;align-items:baseline;gap:6px">' +
-          '<span style="font-weight:600">' + esc(r.alvo.nome) + '</span>' +
-          '<span style="color:' + COR.dim + ';font-size:10px">' + numero(r.alvo.hp) + ' hp' + (r.alvo.hpMedido ? '' : ' ≈') + '</span>' +
-          '<span style="margin-left:auto;font-family:' + MONO + ';font-size:15px;color:' +
-            (real ? COR.med : COR.dim) + '">' + (real ? numero(real.xps) : '—') + '</span>' +
-          '<span style="color:' + COR.dim + ';font-size:10px">xp/s</span>' +
+        '<div style="display:flex;align-items:baseline;gap:7px">' +
+          '<span style="font-weight:600;font-size:13px">' + esc(r.alvo.nome) + '</span>' +
+          '<span style="color:' + COR.dim + ';font-size:10px">' +
+            (r.alvo.nivel ? 'nv' + r.alvo.nivel + ' · ' : '') + numero(r.alvo.hp) + ' hp' + (r.alvo.hpMedido ? '' : ' ≈') + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:baseline;gap:6px;margin-top:3px">' +
+          '<span style="font:600 27px/1 ' + MONO + ';letter-spacing:-.5px;color:' + (real ? COR.med : COR.dim) + '">' +
+            (real ? numero(real.xps) : '—') + '</span>' +
+          '<span style="color:' + COR.dim + ';font-size:10px">xp/s' + (real ? ' medido' : '') + '</span>' +
         '</div>' +
         (real
-          ? '<div style="color:' + COR.dim + ';font-size:10px;margin-top:1px">' +
-              real.seg.toFixed(1) + 's por abate · ' + numero(real.abates) + ' medidos</div>'
-          : '<div style="color:' + COR.dim + ';font-size:10px;margin-top:1px">medindo o ritmo…</div>') +
+          ? '<div style="color:' + COR.dim + ';font-size:10px;margin-top:3px">' +
+              real.seg.toFixed(1) + 's por abate · ' + numero(real.abates) + ' abates medidos</div>'
+          : '<div style="color:' + COR.dim + ';font-size:10px;margin-top:3px">medindo o ritmo…</div>') +
+        (aquiXps > 0
+          ? '<div style="margin-top:9px">' +
+              '<div style="position:relative;height:6px;background:' + COR.trilho + ';border-radius:4px">' +
+                '<div style="position:absolute;left:' + posRail.toFixed(0) + '%;top:-3px;width:3px;height:12px;' +
+                  'background:' + COR.med + ';border-radius:2px;transform:translateX(-1px)"></div>' +
+              '</div>' +
+              '<div style="font-size:10px;margin-top:4px;font-family:' + MONO + ';color:' +
+                (melhores.length ? COR.modelo : COR.med) + '">' +
+                (melhores.length ? '↓ ' + esc(melhores[0].nome) + ' rende ' + ganho.toFixed(1) + '× mais'
+                                 : '▲ melhor alvo ao seu alcance') + '</div>' +
+            '</div>'
+          : '') +
         (function () {
           const p = faltaParaNivel();
           if (!p) return '';
@@ -962,15 +994,15 @@
           if (p.faltaXp && real && real.xps > 0) {
             const seg = p.faltaXp / real.xps;
             const ab = Math.max(1, Math.round(p.faltaXp / (real.xps * real.seg)));
-            corpo = (ativo ? 'nv' + (ativo.nivel + 1) : 'subir') + ' · ' + tempo(seg) +
-                    ' · ' + numero(p.faltaXp) + ' xp · ' + ab + (ab === 1 ? ' abate' : ' abates');
+            corpo = tempo(seg) + ' · ' + numero(p.faltaXp) + ' xp · ' + ab + (ab === 1 ? ' abate' : ' abates') +
+                    (ativo ? ' <span style="color:' + COR.dim + '">p/ nv' + (ativo.nivel + 1) + '</span>' : '');
             cor = COR.med;
           } else {
             corpo = 'medindo o XP do nível…';
             cor = COR.dim;
           }
           // Meta mais distante: evoluir (o socket manda evolveNeedLevel/evolvesToName)
-          // ou o próximo nível "redondo". Tempo projetado pela curva medida (TSM-233).
+          // ou o próximo nível "redondo". Tempo PROJETADO pela curva medida → ciano.
           let metaLinha = '';
           if (ativo && real && real.xps > 0) {
             const evo = (ativo.evolveNeedLevel && ativo.evolveNeedLevel > ativo.nivel)
@@ -980,43 +1012,42 @@
               const fm = faltaParaMeta(evo.nv);
               if (fm) {
                 const rot = evo.txt ? evo.txt + ' (nv' + evo.nv + ')' : 'nv' + evo.nv;
-                metaLinha = '<div style="margin-top:1px;color:' + COR.dim + ';font-size:10px;font-family:' + MONO + '">' +
+                metaLinha = '<div style="margin-top:2px;color:' + COR.modelo + ';font-size:10px;font-family:' + MONO + '">' +
                   '≈ ' + tempo(fm.faltaXp / real.xps) + ' p/ ' + rot + '</div>';
               }
             }
           }
-          return '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
-            '<div style="flex:1;height:5px;background:' + COR.linha + ';border-radius:3px;overflow:hidden">' +
-              '<div style="width:' + p.pct.toFixed(1) + '%;height:100%;background:' + COR.med + ';border-radius:3px"></div></div>' +
-            '<span style="color:' + COR.dim + ';font-size:9px;font-family:' + MONO + '">' + p.pct.toFixed(0) + '%</span>' +
+          return '<div style="display:flex;align-items:center;margin-top:10px;margin-bottom:5px">' +
+              '<span style="font:600 9.5px ' + MONO + ';letter-spacing:.16em;color:' + COR.dim + '">PROGRESSO</span>' +
+              (ativo ? '<span style="margin-left:auto;font-size:10px;color:' + COR.dim + ';font-family:' + MONO + '">nv' +
+                ativo.nivel + ' → ' + (ativo.nivel + 1) + '</span>' : '') +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:7px">' +
+              '<div style="flex:1;height:6px;background:' + COR.trilho + ';border-radius:4px;overflow:hidden">' +
+                '<div style="width:' + p.pct.toFixed(1) + '%;height:100%;background:' + COR.med + ';border-radius:4px"></div></div>' +
+              '<span style="color:' + COR.txt + ';font-size:10px;font-family:' + MONO + '">' + p.pct.toFixed(0) + '%</span>' +
           '</div>' +
-          '<div style="margin-top:2px;color:' + cor + ';font-size:10px;font-family:' + MONO + '">' + corpo + '</div>' +
+          '<div style="margin-top:5px;color:' + cor + ';font-size:10px;font-family:' + MONO + '">' + corpo + '</div>' +
           metaLinha;
         })() +
         (eu
-          ? '<div style="color:' + COR.dim + ';font-size:10px;margin-top:3px">' +
+          ? '<div style="color:' + COR.dim + ';font-size:10px;margin-top:5px">' +
               esc(eu.golpe.n) + ' ×' + eu.golpe.ef.toFixed(2) + ' · ' + eu.golpes +
               ' golpe' + (eu.golpes === 1 ? '' : 's') + ' de ' + numero(eu.dano) + ' · ' +
-              '<span style="color:' + (eu.fonte.indexOf('medido') === 0 ? COR.med : COR.dim) + '">' +
+              '<span style="color:' + (eu.fonte.indexOf('medido') === 0 ? COR.med : COR.modelo) + '">' +
                 (eu.fonte.indexOf('medido') === 0 ? 'medido' : 'estimado') + '</span></div>'
           : '');
 
-      const lista = temDados ? melhoresCacas(400) : null;
+      // lista/atual/outros/melhores/ganho vêm do bloco do herói (a régua usa os mesmos).
       if (!lista || !lista.length) { cacas.innerHTML = ''; return; }
-      const atual = lista.find(function (c) { return c.nome === r.alvo.nome; });
-      const outros = lista.filter(function (c) { return c.nome !== r.alvo.nome; });
-      // Referência é o xp/s MEDIDO quando existe. A lista já vem calibrada pela
-      // mesma medição, então agora as duas colunas estão na mesma régua.
-      const aquiXps = real ? real.xps : (atual ? atual.xps : 0);
-      const melhores = outros.filter(function (c) { return c.xps > aquiXps * 1.05; });
       const mostra = (melhores.length ? melhores : outros).slice(0, 3);
-      const ganho = melhores.length && aquiXps > 0 ? melhores[0].xps / aquiXps : null;
+      const refXps = Math.max.apply(null, [aquiXps, 1].concat(mostra.map(function (c) { return c.xps; })));
 
       cacas.innerHTML =
-        '<div style="border-top:1px solid ' + COR.linha + ';padding-top:7px;color:' + COR.dim +
-          ';font-size:9.5px;letter-spacing:.08em">' +
+        '<div style="border-top:1px solid ' + COR.linha + ';padding-top:8px;color:' + COR.dim +
+          ';font:600 9.5px ' + MONO + ';letter-spacing:.16em;margin-bottom:5px">' +
           (melhores.length ? 'RENDE MAIS' : 'OUTRAS OPÇÕES') + '</div>' +
-        mostra.map(linhaCaca).join('') +
+        mostra.map(function (c) { return linhaCaca(c, refXps); }).join('') +
         (atual && atual.overkill
           ? '<div style="color:' + COR.med + ';font-size:10px;margin-top:5px">Você mata em 1 golpe e espera ' +
               atual.espera.toFixed(1) + 's. Subir de nível não acelera nada aqui.</div>'
