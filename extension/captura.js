@@ -897,20 +897,26 @@
           if (!p) return '';
           // Com o span medido e o xp/s do alvo, o "quanto falta" vira número:
           // tempo · XP que falta · nº de abates. Sem span ainda, mostra só o %.
-          let dir = p.falta.toFixed(1) + '%';
-          let cor = COR.dim;
+          // A barra vai numa LINHA PRÓPRIA, full-width — antes ela dividia a linha
+          // com o texto (flex:1) e o texto longo a espremia até sumir. O texto
+          // ("nvX · tempo · xp · abates") fica embaixo, sem competir por espaço.
+          let corpo, cor;
           if (p.faltaXp && real && real.xps > 0) {
             const seg = p.faltaXp / real.xps;
             const ab = Math.max(1, Math.round(p.faltaXp / (real.xps * real.seg)));
-            dir = tempo(seg) + ' · ' + numero(p.faltaXp) + ' xp · ' + ab + (ab === 1 ? ' abate' : ' abates');
+            corpo = (ativo ? 'nv' + (ativo.nivel + 1) : 'subir') + ' · ' + tempo(seg) +
+                    ' · ' + numero(p.faltaXp) + ' xp · ' + ab + (ab === 1 ? ' abate' : ' abates');
             cor = COR.med;
+          } else {
+            corpo = 'medindo o XP do nível…';
+            cor = COR.dim;
           }
-          return '<div style="display:flex;align-items:baseline;gap:5px;margin-top:5px">' +
-            '<div style="flex:1;height:3px;background:' + COR.linha + ';border-radius:2px;overflow:hidden">' +
-              '<div style="width:' + p.pct.toFixed(1) + '%;height:100%;background:' + COR.med + '"></div></div>' +
-            '<span style="color:' + cor + ';font-size:10px;font-family:' + MONO + '">' +
-              dir + (ativo ? ' p/ nv' + (ativo.nivel + 1) : ' p/ subir') +
-            '</span></div>';
+          return '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
+            '<div style="flex:1;height:5px;background:' + COR.linha + ';border-radius:3px;overflow:hidden">' +
+              '<div style="width:' + p.pct.toFixed(1) + '%;height:100%;background:' + COR.med + ';border-radius:3px"></div></div>' +
+            '<span style="color:' + COR.dim + ';font-size:9px;font-family:' + MONO + '">' + p.pct.toFixed(0) + '%</span>' +
+          '</div>' +
+          '<div style="margin-top:2px;color:' + cor + ';font-size:10px;font-family:' + MONO + '">' + corpo + '</div>';
         })() +
         (eu
           ? '<div style="color:' + COR.dim + ';font-size:10px;margin-top:3px">' +
