@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "PIW — Coletor de Dados",
+  "version": "1.0.0",
+  "description": "Observa o WebSocket do Poke Idle World e acumula dados de combate para pesquisa. Somente leitura: não envia nada ao servidor.",
+  "content_scripts": [
+    {
+      "matches": ["https://poke.idleworld.online/*"],
+      "js": ["dados-combate.js", "breeding.js", "captura.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}
