@@ -48,10 +48,11 @@ const barraExp = pct => [{
   getAttribute: () => null,
   querySelectorAll: () => [{ style: { width: pct.toFixed(4) + '%' } }],
 }];
-// card do pokémon ativo: title "(ativo)" e texto com o XP absoluto "atual/necessário"
+// card do pokémon ativo: title "(ativo)". O HP cheio (1620/1620) vem ANTES do XP
+// de propósito — é o número que era pego por engano e dava falta zero.
 const cardAtivo = (atual, prox) => [{
   getAttribute: k => (k === 'title' ? 'Exeggcute (ativo)' : null),
-  textContent: 'Exeggcute Lv.92 ' + atual + '/' + prox + ' EXP',
+  textContent: 'Exeggcute Lv.92 1620/1620 HP ' + atual + '/' + prox + ' EXP 27%',
   querySelectorAll: () => [],
 }];
 const ctx = vm.createContext(Object.assign(janela, {
@@ -289,6 +290,10 @@ t('estima o tempo pelo ritmo medido', p2 && Math.abs(p2.seg - 1928.4) < 5,
 doc.nos = cardAtivo(961, 1884);        // faltam 923 XP
 const pAbs = ctx.__piwColetor.faltaNivel(100);   // 100 XP/s medido -> 9,23 s
 t('usa o XP absoluto do card do ativo', pAbs && pAbs.exato === true, pAbs && 'exato=' + pAbs.exato);
+// se pegasse o HP cheio (1620/1620), pct seria 100% e o tempo 0. Pegando o XP
+// (961/1884), pct ~51% e tempo 9,23s. É o teste que reproduz o bug do "0,2s".
+t('pega o XP, nao o HP cheio que vem antes', pAbs && pAbs.seg > 1 && Math.abs(pAbs.pct - 51.0085) < 0.01,
+  pAbs && 'pct ' + pAbs.pct.toFixed(1) + '% seg ' + pAbs.seg.toFixed(2));
 t('tempo = XP que falta / XP por segundo', pAbs && Math.abs(pAbs.seg - 9.23) < 0.001,
   pAbs && pAbs.seg.toFixed(2) + 's');
 t('pct vem do XP absoluto', pAbs && Math.abs(pAbs.pct - 100 * 961 / 1884) < 0.001, pAbs && pAbs.pct.toFixed(1) + '%');

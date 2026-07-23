@@ -605,7 +605,9 @@
       const nos = document.querySelectorAll('[title]');
       for (const n of nos) {
         if (!/\((ativo|active)\)/i.test(n.getAttribute('title') || '')) continue;
-        const m = (n.textContent || '').match(/([\d.,]+)\s*\/\s*([\d.,]+)/);
+        // Ancorar em "…/… XP": o card tem VÁRIOS "X/Y" (HP cheio 1620/1620 vinha
+        // ANTES do XP e era pego por engano, dando falta zero -> tempo ~0s).
+        const m = (n.textContent || '').match(/([\d.,]+)\s*\/\s*([\d.,]+)\s*E?XP/i);
         if (!m) continue;
         const at = +m[1].replace(/[.,]/g, ''), nx = +m[2].replace(/[.,]/g, '');
         if (nx > 0 && at >= 0 && at <= nx) return { atual: at, prox: nx, falta: nx - at };
