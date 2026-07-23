@@ -290,7 +290,18 @@ t('traduz "quanto falta" em XP', p4 && Math.abs(p4.faltaXp - 72000) < 200, p4 &&
 doc.nos = cardAtivo(2.5);
 const p5 = ctx.__piwColetor.faltaNivel();
 t('level up: le a nova barra baixa', p5 && Math.abs(p5.pct - 2.5) < 0.001, p5 && p5.pct + '%');
-doc.nos = [];
+
+// ---- projeção até uma META de nível (TSM-233) ----
+// O span medido é guardado por nível; a meta soma o que falta agora + o span
+// (medido ou projetado pela cúbica) de cada nível no caminho.
+const dMeta = ctx.__piwColetor.dados();
+t('persiste o span medido por nível', dMeta.spans && Math.abs(dMeta.spans[7] - 133333) < 200, dMeta.spans && dMeta.spans[7]);
+doc.nos = cardAtivo(50);                       // ativo nv7, barra em 50% ⇒ falta 50% de 133.333 = 66.666
+const meta1 = ctx.__piwColetor.faltaMeta(8);   // próximo nível: só o que resta do atual
+t('meta do proximo nivel = XP restante', meta1 && Math.abs(meta1.faltaXp - 66666) < 400 && meta1.niveis === 1, meta1 && Math.round(meta1.faltaXp));
+const meta2 = ctx.__piwColetor.faltaMeta(9);   // 2 níveis: soma o span projetado do nv8
+t('meta de 2 niveis soma a curva projetada', meta2 && meta2.niveis === 2 && meta2.faltaXp > meta1.faltaXp + 100000, meta2 && Math.round(meta2.faltaXp));
+t('meta <= nivel atual nao projeta', ctx.__piwColetor.faltaMeta(7) === null);
 doc.nos = [];
 
 // ---- desfecho do shiny ----

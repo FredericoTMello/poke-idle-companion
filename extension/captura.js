@@ -40,6 +40,7 @@
     cruasRecebidas: [], // idem para golpes RECEBIDOS: mede a cadência do inimigo
     amostraPoke: null, // 1º pokémon do time cru — revela se o socket manda o XP
     amostrasDrop: {},  // forma crua das mensagens de drop/loot (p/ contar "Rare Pokemon Picture")
+    spans: {},         // nível -> XP total do nível, MEDIDO (barra + xpGained): a curva real
     minutosAtivos: 0,
   });
 
@@ -52,6 +53,7 @@
     // lança, e o catch do registrador engoliria TODA a coleta em silêncio.
     if (!Array.isArray(D.cruasRecebidas)) D.cruasRecebidas = [];
     if (!D.amostrasDrop || typeof D.amostrasDrop !== 'object') D.amostrasDrop = {};
+    if (!D.spans || typeof D.spans !== 'object') D.spans = {};
   } catch (e) { D = vazio(); }
 
   // ---- estado volátil ----
@@ -111,6 +113,10 @@
       // Para o breeding: shiny se conserva na cria, e Ditto não cruza. Guardamos
       // defensivamente — se a mensagem não trouxer, fica false e não atrapalha.
       shiny: !!p.shiny, ditto: /ditto/i.test(p.name || ''),
+      // Campos que o socket já manda e não usávamos: XP absoluto (curva/metas),
+      // evolução (ETA p/ evoluir) e valor de venda (triagem). TSM-233/228/234.
+      xp: p.xp, evolveNeedLevel: p.evolveNeedLevel, evolvesToName: p.evolvesToName,
+      sellValue: p.sellValue,
     };
     sujo = true;
   }
@@ -665,7 +671,11 @@
     progAncora.xpAcc += xpGanho;
     const dp = pct - progAncora.pct;
     // Só publica com avanço ≥3% da barra: divisão por Δ pequeno amplia o ruído.
-    if (dp >= 3 && progAncora.xpAcc > 0) spanNivel = progAncora.xpAcc / (dp / 100);
+    if (dp >= 3 && progAncora.xpAcc > 0) {
+      spanNivel = progAncora.xpAcc / (dp / 100);
+      // Guarda a curva REAL por nível: alimenta a projeção de metas (TSM-233).
+      if (nv != null) { D.spans[nv] = Math.round(spanNivel); sujo = true; }
+    }
   }
 
   // Quanto falta para o próximo nível, EM NÚMERO. A barra dá o %, o span dá o XP
@@ -675,6 +685,40 @@
     if (pct === null || !isFinite(pct)) return null;
     const falta = 100 - pct;
     return { pct, falta, spanXp: spanNivel, faltaXp: spanNivel ? spanNivel * falta / 100 : null };
+  }
+
+  // Constante da curva de XP, ajustada pelos spans MEDIDOS. A curva de idle é
+  // cúbica: span(L) = k·(3L²+3L+1). Cada nível medido dá um k; usamos a média.
+  // Começa com 1 ponto (o nível atual) e afia sozinha conforme o jogador sobe.
+  function kCurvaXp() {
+    let soma = 0, n = 0;
+    for (const L in D.spans) {
+      const l = +L, base = 3 * l * l + 3 * l + 1;
+      if (base > 0 && D.spans[L] > 0) { soma += D.spans[L] / base; n++; }
+    }
+    return n ? soma / n : null;
+  }
+  function spanDoNivel(L) {
+    if (D.spans[L] > 0) return D.spans[L];      // medido: exato
+    const k = kCurvaXp();
+    return k ? k * (3 * L * L + 3 * L + 1) : null; // projetado pela cúbica
+  }
+
+  // XP e tempo até uma META de nível. Soma o que falta do nível atual + o span
+  // (medido ou projetado) de cada nível intermediário. Marcado como estimativa
+  // porque a maior parte ainda é projeção — vira exato à medida que se mede.
+  function faltaParaMeta(nivelAlvo) {
+    const p = faltaParaNivel();
+    if (!p || !ativo || p.faltaXp == null) return null;
+    const Lc = ativo.nivel;
+    if (!(nivelAlvo > Lc)) return null;
+    let xp = p.faltaXp;
+    for (let L = Lc + 1; L < nivelAlvo; L++) {
+      const s = spanDoNivel(L);
+      if (s == null) return null;               // sem curva ainda: não chuta
+      xp += s;
+    }
+    return { nivelAlvo, faltaXp: Math.round(xp), niveis: nivelAlvo - Lc };
   }
 
   // Resumo da sessão em texto, para o jogador colar no chat do jogo.
@@ -925,12 +969,29 @@
             corpo = 'medindo o XP do nível…';
             cor = COR.dim;
           }
+          // Meta mais distante: evoluir (o socket manda evolveNeedLevel/evolvesToName)
+          // ou o próximo nível "redondo". Tempo projetado pela curva medida (TSM-233).
+          let metaLinha = '';
+          if (ativo && real && real.xps > 0) {
+            const evo = (ativo.evolveNeedLevel && ativo.evolveNeedLevel > ativo.nivel)
+              ? { nv: ativo.evolveNeedLevel, txt: 'evoluir' + (ativo.evolvesToName ? ' em ' + esc(ativo.evolvesToName) : '') }
+              : { nv: Math.ceil((ativo.nivel + 1) / 10) * 10, txt: null };
+            if (evo.nv > ativo.nivel + 1) {
+              const fm = faltaParaMeta(evo.nv);
+              if (fm) {
+                const rot = evo.txt ? evo.txt + ' (nv' + evo.nv + ')' : 'nv' + evo.nv;
+                metaLinha = '<div style="margin-top:1px;color:' + COR.dim + ';font-size:10px;font-family:' + MONO + '">' +
+                  '≈ ' + tempo(fm.faltaXp / real.xps) + ' p/ ' + rot + '</div>';
+              }
+            }
+          }
           return '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
             '<div style="flex:1;height:5px;background:' + COR.linha + ';border-radius:3px;overflow:hidden">' +
               '<div style="width:' + p.pct.toFixed(1) + '%;height:100%;background:' + COR.med + ';border-radius:3px"></div></div>' +
             '<span style="color:' + COR.dim + ';font-size:9px;font-family:' + MONO + '">' + p.pct.toFixed(0) + '%</span>' +
           '</div>' +
-          '<div style="margin-top:2px;color:' + cor + ';font-size:10px;font-family:' + MONO + '">' + corpo + '</div>';
+          '<div style="margin-top:2px;color:' + cor + ';font-size:10px;font-family:' + MONO + '">' + corpo + '</div>' +
+          metaLinha;
         })() +
         (eu
           ? '<div style="color:' + COR.dim + ';font-size:10px;margin-top:3px">' +
@@ -977,5 +1038,6 @@
     ranking: temDados ? ranking : null,
     melhoresCacas: temDados ? melhoresCacas : null,
     resumo: resumoTexto,
-    faltaNivel: faltaParaNivel };
+    faltaNivel: faltaParaNivel,
+    faltaMeta: faltaParaMeta };
 })();
