@@ -39,6 +39,7 @@
     cruas: [],         // janela deslizante de golpes DADOS, com carimbo de tempo
     cruasRecebidas: [], // idem para golpes RECEBIDOS: mede a cadência do inimigo
     amostraPoke: null, // 1º pokémon do time cru — revela se o socket manda o XP
+    amostrasDrop: {},  // forma crua das mensagens de drop/loot (p/ contar "Rare Pokemon Picture")
     minutosAtivos: 0,
   });
 
@@ -50,6 +51,7 @@
     // Base gravada por versão anterior não tem esta janela. Sem isto o push
     // lança, e o catch do registrador engoliria TODA a coleta em silêncio.
     if (!Array.isArray(D.cruasRecebidas)) D.cruasRecebidas = [];
+    if (!D.amostrasDrop || typeof D.amostrasDrop !== 'object') D.amostrasDrop = {};
   } catch (e) { D = vazio(); }
 
   // ---- estado volátil ----
@@ -135,6 +137,18 @@
     let m;
     try { m = comoJson(dado); } catch (e) { return; }
     if (!m || !m.type) return;
+    // Captura a FORMA de mensagens de drop/loot — uma amostra por tipo, mais
+    // qualquer mensagem que cite "Picture" (o drop raro "Rare Pokemon Picture").
+    // Não modela nada: só grava o cru para descobrir por qual evento e com quais
+    // campos o drop chega, e então montar o contador certo (medir antes de modelar).
+    if (Object.keys(D.amostrasDrop).length < 12) {
+      const tipoDrop = /drop|loot|reward|item/i.test(m.type);
+      const citaFoto = typeof dado === 'string' && /Picture|Foto/i.test(dado);
+      const alvoAmostra = citaFoto ? 'PICTURE:' + m.type : (tipoDrop ? m.type : null);
+      if (alvoAmostra && !D.amostrasDrop[alvoAmostra]) {
+        try { D.amostrasDrop[alvoAmostra] = JSON.parse(JSON.stringify(m)); sujo = true; } catch (e) {}
+      }
+    }
     try {
       if (m.type === 'pokes' && Array.isArray(m.list)) { m.list.forEach(guardaPoke); return; }
       if (m.type === 'poke-delta' && m.poke) { guardaPoke(m.poke); return; }
